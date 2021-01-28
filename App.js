@@ -1,46 +1,79 @@
-import { StatusBar } from 'expo-status-bar';
-import React, {useState, useEffect} from 'react';
-import { SafeAreaView, StyleSheet, Text, View } from 'react-native';
-import CourseList from './components/CourseList'
+import 'react-native-gesture-handler';
+import React, { useContext, useEffect, useState } from 'react';
+import { Button } from 'react-native';
+import { NavigationContainer } from '@react-navigation/native';
+import { createStackNavigator } from '@react-navigation/stack';
+import ScheduleScreen from './screens/ScheduleScreen';
+import CourseDetailScreen from './screens/CourseDetailScreen';
+import CourseEditScreen from './screens/CourseEditScreen';
+import SignInScreen from './screens/SignInScreen';
+import UserContext from './UserContext';
+import { firebase } from './firebase';
 
-const Banner = ({title}) => (
-  <Text style = {styles.bannerStyle}> {title || '[loading...]'} </Text>
-)
+const Stack = createStackNavigator();
+
+const SignInButton = ({ navigation, user }) => (
+  user && user.uid
+    ?
+    <Button title="Logout" color="#448aff"
+      onPress={() => firebase.auth().signOut()}
+    />
+    :
+    <Button title="SignIn" color="#448aff"
+      onPress={() => navigation.navigate('SignInScreen')}
+    />
+);
 
 const App = () => {
-  const[schedule, setSchedule] = useState({title:'', courses: []});
-  
-  const url = 'https://courses.cs.northwestern.edu/394/data/cs-courses.php';
+  const [user, setUser] = useState({});
+  const [auth, setAuth] = useState();
 
-  useEffect (() => {
-    const fetchSchedule = async () => {
-      const response = await fetch(url);
-      if (!response.ok) throw response;
-      const json = await response.json();
-      setSchedule(json);
-    }
-    fetchSchedule();
+  useEffect(() => {
+    firebase.auth().onAuthStateChanged((auth) => {
+      setAuth(auth);
+    });
   }, []);
 
-  return (
-    <SafeAreaView style = {styles.container}>
-      <Banner title={schedule.title} />
-      <CourseList courses = {schedule.courses} />
-    </SafeAreaView>
-  )
-}
+  useEffect(() => {
+    if (auth && auth.uid) {
+      const db = firebase.database().ref('users').child(auth.uid);
+      const handleData = snap => {
+        setUser({uid: auth.uid, ...snap.val()});
+      }
+      db.on('value', handleData, error => alert(error));
+      return () => { db.off('value', handleData); };
+    } else {
+      setUser(null);
+    }
+  }, [auth]);
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingTop: 20,
-  },
-  bannerStyle: {
-    color: '#888',
-    fontSize: 32,
-  },
-});
+  return (
+      <UserContext.Provider value={user}>
+        <NavigationContainer>
+          <Stack.Navigator>
+                <Stack.Screen name="ScheduleScreen"
+                  component={ScheduleScreen}
+                  options={({navigation}) => ({ 
+                    title: "Schedule",
+                    headerRight: () => (
+                      <SignInButton navigation={navigation} user={user} />
+                    ),
+                  })
+                }
+                />
+                <Stack.Screen name="CourseDetailScreen"
+                              component={CourseDetailScreen}
+                              options={{title: 'Course detail'}}
+                />
+                <Stack.Screen name="CourseEditScreen"
+                              component={CourseEditScreen}
+                              options={{ title: 'Course Editor'}}
+                />
+                <Stack.Screen name="SignInScreen" component={SignInScreen} />
+            </Stack.Navigator>
+        </NavigationContainer>
+      </UserContext.Provider>
+  );
+};
 
 export default App;

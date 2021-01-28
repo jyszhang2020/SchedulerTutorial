@@ -23,11 +23,13 @@ const getCourseNumber = course => (
 //     and an hours value, e.g., { start: 540, end: 630 }, 
 //     with start and end in minutes past midnight
 
-const allDays = ['M', 'Tu', 'W', 'Th', 'F', 'Sa', 'Su'];
+const daysPat = /M|Tu|W|Th|F/g;
 const timesPat = /(\d\d?):(\d\d) *[ -] *(\d\d?):(\d\d)/;
 
 const addTimes = (course) => {
-  course.days = allDays.filter(day => course.meets.includes(day));
+  course.days = (!course.meets) ? [] : (
+    Array.from(course.meets.matchAll(daysPat)).map(m => m[0])
+  );
 
   const [match, hh1, mm1, hh2, mm2] = timesPat.exec(course.meets);
   if (match) {
